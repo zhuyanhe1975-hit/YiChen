@@ -1,0 +1,8 @@
+{
+  "name": "Dragon Ball Little Assistant (YiChen)",
+  "description": "An energetic, Dragon Ball themed educational AI assistant for junior high students, featuring knowledge mapping, mistake tracking, and personalized training.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}
