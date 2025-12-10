@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { TimelineData } from '../types';
-import { Clock, History } from 'lucide-react';
+import { History } from 'lucide-react';
 
 interface TimelineRendererProps {
   data: TimelineData;
@@ -32,7 +32,7 @@ const TimelineRenderer: React.FC<TimelineRendererProps> = ({ data }) => {
                     <div className="bg-white p-3 rounded-lg border border-orange-200 shadow-md hover:shadow-lg hover:border-orange-400 transition-all text-center">
                       <div className="text-orange-600 font-bold text-lg font-comic">{event.date}</div>
                       <div className="text-gray-800 font-bold text-sm mb-1">{event.title}</div>
-                      <p className="text-xs text-gray-500 leading-tight">{event.description}</p>
+                      <p className="text-xs text-gray-500 leading-tight line-clamp-3">{event.description}</p>
                     </div>
                     {/* Connector Line */}
                     <div className="w-0.5 h-4 bg-orange-300 mx-auto mt-1"></div>
@@ -51,7 +51,7 @@ const TimelineRenderer: React.FC<TimelineRendererProps> = ({ data }) => {
                     <div className="bg-white p-3 rounded-lg border border-orange-200 shadow-md hover:shadow-lg hover:border-orange-400 transition-all text-center">
                       <div className="text-orange-600 font-bold text-lg font-comic">{event.date}</div>
                       <div className="text-gray-800 font-bold text-sm mb-1">{event.title}</div>
-                      <p className="text-xs text-gray-500 leading-tight">{event.description}</p>
+                      <p className="text-xs text-gray-500 leading-tight line-clamp-3">{event.description}</p>
                     </div>
                   </div>
 

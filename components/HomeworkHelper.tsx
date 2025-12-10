@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { HomeworkTask, Subject } from '../types';
 import { SUBJECT_COLORS } from '../constants';
-import { Plus, Clock, Check, Play, Square, GraduationCap, Trash2, Image as ImageIcon, Volume2, AlertCircle, Edit2, Save } from 'lucide-react';
+import { Plus, Clock, Check, Play, Square, GraduationCap, Trash2, Image as ImageIcon, Volume2, AlertCircle, Edit2, Save, Calendar } from 'lucide-react';
 
 interface HomeworkHelperProps {
   tasks: HomeworkTask[];
@@ -20,6 +21,7 @@ const HomeworkHelper: React.FC<HomeworkHelperProps> = ({ tasks, setTasks, onStar
   });
   const [targetMinutes, setTargetMinutes] = useState<string>('');
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [todayDate, setTodayDate] = useState<string>('');
   
   // Edit Mode State
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -55,7 +57,17 @@ const HomeworkHelper: React.FC<HomeworkHelperProps> = ({ tasks, setTasks, onStar
   };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    // Set Date
+    const date = new Date();
+    const formatter = new Intl.DateTimeFormat('zh-CN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+    });
+    setTodayDate(formatter.format(date));
+
+    let interval: ReturnType<typeof setInterval>;
     if (activeTaskId) {
       interval = setInterval(() => {
         setTasks(prev => prev.map(t => {
@@ -81,7 +93,7 @@ const HomeworkHelper: React.FC<HomeworkHelperProps> = ({ tasks, setTasks, onStar
         readers.push(new Promise((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(file as Blob);
         }));
       });
 
@@ -304,6 +316,16 @@ const HomeworkHelper: React.FC<HomeworkHelperProps> = ({ tasks, setTasks, onStar
 
       {/* List Section */}
       <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+         <div className="flex items-center justify-between mb-2 px-1">
+             <h3 className="font-bold text-gray-700 text-lg flex items-center gap-2">
+                 📅 今日任务清单
+             </h3>
+             <div className="text-sm font-bold text-orange-600 bg-orange-100 px-3 py-1 rounded-full shadow-sm flex items-center gap-1">
+                 <Calendar size={14} />
+                 {todayDate}
+             </div>
+         </div>
+
          {tasks.length === 0 && (
              <div className="text-center text-gray-400 py-10">
                  <p>还没有任务，快去添加吧！</p>

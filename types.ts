@@ -1,4 +1,6 @@
 
+import React from 'react';
+
 export enum MessageRole {
   USER = 'user',
   MODEL = 'model',
@@ -36,6 +38,45 @@ export interface TimelineData {
   events: TimelineEvent[];
 }
 
+export type RAGProvider = 'google' | 'tencent' | 'alibaba';
+
+export interface VertexAIConfig {
+  projectId: string;
+  location: string;
+  dataStoreId: string;
+}
+
+export interface TencentConfig {
+  secretId: string;
+  secretKey: string;
+  knowledgeBaseId: string;
+  region: string;
+}
+
+export interface AlibabaRAGConfig {
+  appId: string;
+  apiKey: string;
+}
+
+export interface RAGSource {
+  title: string;
+  uri: string;
+  snippet?: string;
+}
+
+// --- Multi-Model Support ---
+
+export type ModelProvider = 'gemini' | 'chatgpt' | 'deepseek' | 'tencent' | 'alibaba' | 'baidu';
+
+export interface AIConfig {
+  provider: ModelProvider;
+  apiKey: string;
+  baseUrl?: string; // Optional custom base URL
+  modelName: string; // Specific model version (e.g. gpt-4, deepseek-chat)
+}
+
+// ---------------------------
+
 export interface Message {
   id: string;
   role: MessageRole;
@@ -44,8 +85,15 @@ export interface Message {
   images?: string[]; // Multiple images
   batchData?: BatchItem[]; // Structured data from batch analysis
   timelineData?: TimelineData; // New: Timeline data
+  generatedImage?: string; // New: AI Generated Image (Base64)
+  ragSources?: RAGSource[]; // New: RAG Citations
   isWrongQuestionAnalysis?: boolean;
   timestamp: number;
+}
+
+export interface KnowledgeNodeItem {
+  label: string;
+  description: string;
 }
 
 export interface KnowledgeNode {
@@ -55,10 +103,10 @@ export interface KnowledgeNode {
 }
 
 export interface KnowledgeMapData {
-  center: string;
-  parents: string[];
-  children: string[];
-  related: string[];
+  center: KnowledgeNodeItem;
+  parents: KnowledgeNodeItem[];
+  children: KnowledgeNodeItem[];
+  related: KnowledgeNodeItem[];
 }
 
 export interface WrongQuestion {
@@ -121,6 +169,15 @@ export interface MathPuzzle {
   explanation: string;
 }
 
+export interface ImportPreviewStats {
+  messageCount: number;
+  taskCount: number;
+  questionCount: number;
+  startDate?: string;
+  endDate?: string;
+  totalDays?: number;
+}
+
 export interface AppState {
   messages: Message[];
   knowledgeData: KnowledgeMapData | null;
@@ -129,6 +186,12 @@ export interface AppState {
   stats: UserStats;
   guidelines: SubjectGuidelines;
   recommendations: TrainingRecommendation[];
+  vertexAIConfig?: VertexAIConfig;
+  ragProvider?: RAGProvider; 
+  tencentConfig?: TencentConfig; 
+  alibabaRAGConfig?: AlibabaRAGConfig; // New
+  aiConfig?: AIConfig; // New: AI Provider Config
+  cloudStorageUrl?: string; // New: Custom Cloud Link
 }
 
 export enum Tab {
@@ -138,4 +201,6 @@ export enum Tab {
   STATS = 'stats',
   TRAINING = 'training',
   HOMEWORK = 'homework',
+  KNOWLEDGE = 'knowledge',
+  DATA = 'data'
 }

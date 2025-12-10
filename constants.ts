@@ -1,8 +1,13 @@
 
+
+import { AIConfig } from "./types";
+
 export const APP_NAME = "龙珠小助理";
 export const ASSISTANT_NAME = "YiChen";
 
 export const INITIAL_GREETING = "欧斯！我是龙珠小助理 YiChen！小战士，准备好开始今天的修炼了吗？无论是遇到难题还是想梳理知识，我都能帮你提升战斗力！";
+
+export const GEMINI_WEB_URL = "https://gemini.google.com/app";
 
 export const BASE_SYSTEM_INSTRUCTION = `
 角色设定与目标：
@@ -27,6 +32,48 @@ export const BASE_SYSTEM_INSTRUCTION = `
 - 回复要言简意赅，不要堆砌无用的废话。将核心信息直观地呈现给用户。
 - 如果用户一次性上传多张图片，请务必分别识别每张图片的内容、所属学科（Subject Enum）和具体知识点，并按照JSON格式返回分析结果以便归类。
 `;
+
+export const DEFAULT_AI_CONFIG: AIConfig = {
+  provider: 'gemini',
+  apiKey: '', // User will supply via environment or UI
+  modelName: 'gemini-2.5-flash',
+};
+
+// Presets for quick switching
+export const AI_PROVIDER_PRESETS: Record<string, Partial<AIConfig>> = {
+  'gemini': {
+    baseUrl: '', 
+    modelName: 'gemini-2.5-flash'
+  },
+  'gemini-pro': {
+    baseUrl: '', 
+    modelName: 'gemini-1.5-pro' // Better for complex math
+  },
+  'gemini-thinking': {
+    baseUrl: '',
+    modelName: 'gemini-1.5-pro' // Using 1.5 Pro as stable fallback for reasoning
+  },
+  'chatgpt': {
+    baseUrl: 'https://api.openai.com/v1',
+    modelName: 'gpt-4o'
+  },
+  'deepseek': {
+    baseUrl: 'https://api.deepseek.com',
+    modelName: 'deepseek-chat'
+  },
+  'alibaba': {
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    modelName: 'qwen-plus'
+  },
+  'tencent': {
+    baseUrl: 'https://api.hunyuan.cloud.tencent.com/v1',
+    modelName: 'hunyuan-pro'
+  },
+  'baidu': {
+    baseUrl: '', // Baidu uses a different flow usually, but we can set a placeholder
+    modelName: 'ernie-3.5-8k'
+  }
+};
 
 export const DEFAULT_SUBJECT_GUIDELINES: Record<string, string> = {
   '英语': '对于作文批改，重点关注语法、词汇和逻辑，生成批注和优化后的对照稿。同时，主动分析用户英语错题的共性，设计个性化的训练小单元。',

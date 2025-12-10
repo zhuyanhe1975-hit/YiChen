@@ -1,16 +1,19 @@
 
-import React, { useState, useRef } from 'react';
-import { SubjectGuidelines, AppState } from '../types';
-import { X, Save, RotateCcw, Settings, Download, Upload, AlertTriangle } from 'lucide-react';
-import { DEFAULT_SUBJECT_GUIDELINES } from '../constants';
+import React, { useState } from 'react';
+import { SubjectGuidelines, VertexAIConfig, TencentConfig, AlibabaRAGConfig, RAGProvider, AIConfig, ModelProvider } from '../types';
+import { X, Save, RotateCcw, Settings, AlertTriangle, Database, Cloud, Cpu, Layers } from 'lucide-react';
+import { DEFAULT_SUBJECT_GUIDELINES, AI_PROVIDER_PRESETS } from '../constants';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   guidelines: SubjectGuidelines;
-  onSave: (newGuidelines: SubjectGuidelines) => void;
-  onExportData: () => void;
-  onImportData: (file: File) => void;
+  onSave: (newGuidelines: SubjectGuidelines, vertexConfig?: VertexAIConfig, tencentConfig?: TencentConfig, alibabaConfig?: AlibabaRAGConfig, ragProvider?: RAGProvider, aiConfig?: AIConfig) => void;
+  initialVertexConfig?: VertexAIConfig;
+  initialTencentConfig?: TencentConfig;
+  initialAlibabaConfig?: AlibabaRAGConfig;
+  initialRagProvider?: RAGProvider;
+  initialAIConfig?: AIConfig;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -18,11 +21,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, 
   guidelines, 
   onSave,
-  onExportData,
-  onImportData
+  initialVertexConfig,
+  initialTencentConfig,
+  initialAlibabaConfig,
+  initialRagProvider,
+  initialAIConfig,
 }) => {
   const [localGuidelines, setLocalGuidelines] = useState<SubjectGuidelines>(guidelines);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [ragProvider, setRagProvider] = useState<RAGProvider>(initialRagProvider || 'google');
+  
+  // AI Model Config
+  const [aiConfig, setAIConfig] = useState<AIConfig>(initialAIConfig || { provider: 'gemini', apiKey: '', modelName: 'gemini-2.5-flash' });
+
+  const [vertexConfig, setVertexConfig] = useState<VertexAIConfig>(initialVertexConfig || { projectId: '', location: 'global', dataStoreId: '' });
+  const [tencentConfig, setTencentConfig] = useState<TencentConfig>(initialTencentConfig || { secretId: '', secretKey: '', knowledgeBaseId: '', region: 'ap-guangzhou' });
+  const [alibabaConfig, setAlibabaConfig] = useState<AlibabaRAGConfig>(initialAlibabaConfig || { appId: '', apiKey: '' });
+
+  // Update presets when provider changes
+  const handleProviderChange = (provider: ModelProvider) => {
+    const preset = AI_PROVIDER_PRESETS[provider];
+    setAIConfig(prev => ({
+        ...prev,
+        provider,
+        baseUrl: preset.baseUrl || '',
+        modelName: preset.modelName || ''
+    }));
+  };
 
   if (!isOpen) return null;
 
@@ -32,6 +56,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       [subject]: value
     }));
   };
+  
+  const handleVertexChange = (key: keyof VertexAIConfig, value: string) => {
+    setVertexConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleTencentChange = (key: keyof TencentConfig, value: string) => {
+    setTencentConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleAlibabaChange = (key: keyof AlibabaRAGConfig, value: string) => {
+    setAlibabaConfig(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleReset = () => {
     if (confirm("确定要恢复默认的学科准则吗？")) {
@@ -40,17 +76,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleSave = () => {
-    onSave(localGuidelines);
+    onSave(localGuidelines, vertexConfig, tencentConfig, alibabaConfig, ragProvider, aiConfig);
     onClose();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      if (confirm("导入数据将覆盖当前所有记录，确定继续吗？")) {
-        onImportData(e.target.files[0]);
-        onClose();
-      }
-    }
   };
 
   return (
@@ -71,40 +98,225 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 space-y-8">
           
-          {/* Section 1: Data Management */}
+          {/* Section 0: AI Brain Configuration */}
           <div>
             <h3 className="text-gray-800 font-bold mb-3 flex items-center gap-2">
-              <Upload size={18} className="text-blue-500" /> 数据备份与恢复
+               <Cpu size={18} className="text-purple-500" /> 大模型接入 (AI Model Provider)
             </h3>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="text-sm text-gray-500">
-                <p>可以将当前的修炼记录（聊天、错题、作业、战斗力）导出保存，或者导入之前的备份。</p>
-              </div>
-              <div className="flex gap-3">
-                 <button 
-                   onClick={onExportData}
-                   className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors border border-gray-300"
-                 >
-                   <Download size={16} /> 导出数据
-                 </button>
-                 <button 
-                   onClick={() => fileInputRef.current?.click()}
-                   className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
-                 >
-                   <Upload size={16} /> 导入数据
-                 </button>
-                 <input 
-                   type="file" 
-                   ref={fileInputRef} 
-                   accept=".json" 
-                   className="hidden" 
-                   onChange={handleFileChange} 
-                 />
-              </div>
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                    {[
+                        { id: 'gemini', label: 'Gemini' },
+                        { id: 'chatgpt', label: 'ChatGPT' },
+                        { id: 'deepseek', label: 'DeepSeek' },
+                        { id: 'tencent', label: '腾讯混元' },
+                        { id: 'alibaba', label: '阿里通义' },
+                        { id: 'baidu', label: '百度文心' }
+                    ].map(p => (
+                        <button
+                            key={p.id}
+                            onClick={() => handleProviderChange(p.id as ModelProvider)}
+                            className={`p-2 rounded-lg text-xs font-bold transition-all ${aiConfig.provider === p.id ? 'bg-purple-100 text-purple-700 ring-2 ring-purple-200' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">API Key {aiConfig.provider === 'baidu' ? '(Access Token)' : ''}</label>
+                        <input 
+                            type="password"
+                            value={aiConfig.apiKey}
+                            onChange={(e) => setAIConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                            placeholder={aiConfig.provider === 'baidu' ? "输入 Access Token" : "sk-..."}
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:border-purple-500 outline-none font-mono"
+                        />
+                         <p className="text-[10px] text-gray-400 mt-1">
+                            {aiConfig.provider === 'gemini' && 'Google AI Studio Key'}
+                            {aiConfig.provider === 'deepseek' && 'DeepSeek API Key'}
+                            {aiConfig.provider === 'tencent' && 'Hunyuan API Key (API v3)'}
+                            {aiConfig.provider === 'alibaba' && 'DashScope API Key'}
+                         </p>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Model Name</label>
+                        <input 
+                            type="text"
+                            value={aiConfig.modelName}
+                            onChange={(e) => setAIConfig(prev => ({ ...prev, modelName: e.target.value }))}
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:border-purple-500 outline-none font-mono"
+                        />
+                    </div>
+                </div>
+                
+                {aiConfig.provider !== 'gemini' && (
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">API Base URL (Optional)</label>
+                        <input 
+                            type="text"
+                            value={aiConfig.baseUrl || ''}
+                            onChange={(e) => setAIConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
+                            placeholder="https://api.openai.com/v1"
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:border-purple-500 outline-none font-mono text-gray-600"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">
+                           用于接入中转/代理地址。如果使用官方API，通常无需修改（预设值已自动填入）。
+                        </p>
+                    </div>
+                )}
+            </div>
+          </div>
+          
+          {/* Section 2: Knowledge Base Config */}
+          <div>
+            <h3 className="text-gray-800 font-bold mb-3 flex items-center gap-2">
+              <Database size={18} className="text-indigo-500" /> 知识库服务配置 (RAG)
+            </h3>
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                
+                {/* Provider Selector */}
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 border-b border-gray-100 pb-4">
+                    <span className="text-sm font-bold text-gray-600 whitespace-nowrap">服务提供商:</span>
+                    <div className="flex flex-wrap gap-2">
+                        <button 
+                            onClick={() => setRagProvider('google')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${ragProvider === 'google' ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        >
+                            <Cloud size={14} /> Google Vertex
+                        </button>
+                        <button 
+                            onClick={() => setRagProvider('tencent')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${ragProvider === 'tencent' ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        >
+                            <Database size={14} /> 腾讯云
+                        </button>
+                        <button 
+                            onClick={() => setRagProvider('alibaba')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${ragProvider === 'alibaba' ? 'bg-orange-100 text-orange-700 ring-2 ring-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        >
+                            <Layers size={14} /> 阿里云 (百炼)
+                        </button>
+                    </div>
+                </div>
+
+                {/* Google Config */}
+                {ragProvider === 'google' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">GCP Project ID</label>
+                            <input 
+                                type="text" 
+                                value={vertexConfig.projectId}
+                                onChange={(e) => handleVertexChange('projectId', e.target.value)}
+                                placeholder="my-gcp-project"
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-indigo-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Location (e.g. global)</label>
+                            <input 
+                                type="text" 
+                                value={vertexConfig.location}
+                                onChange={(e) => handleVertexChange('location', e.target.value)}
+                                placeholder="global"
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-indigo-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Data Store ID</label>
+                            <input 
+                                type="text" 
+                                value={vertexConfig.dataStoreId}
+                                onChange={(e) => handleVertexChange('dataStoreId', e.target.value)}
+                                placeholder="my-datastore-id"
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-indigo-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Tencent Config */}
+                {ragProvider === 'tencent' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">SecretId</label>
+                            <input 
+                                type="text" 
+                                value={tencentConfig.secretId}
+                                onChange={(e) => handleTencentChange('secretId', e.target.value)}
+                                placeholder="AKID..."
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">SecretKey</label>
+                            <input 
+                                type="password" 
+                                value={tencentConfig.secretKey}
+                                onChange={(e) => handleTencentChange('secretKey', e.target.value)}
+                                placeholder="Your Secret Key"
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Knowledge Base ID</label>
+                            <input 
+                                type="text" 
+                                value={tencentConfig.knowledgeBaseId}
+                                onChange={(e) => handleTencentChange('knowledgeBaseId', e.target.value)}
+                                placeholder="Knowledge Base ID"
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500 outline-none"
+                            />
+                        </div>
+                         <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Region</label>
+                            <input 
+                                type="text" 
+                                value={tencentConfig.region}
+                                onChange={(e) => handleTencentChange('region', e.target.value)}
+                                placeholder="ap-guangzhou"
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                 {/* Alibaba Config */}
+                 {ragProvider === 'alibaba' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">App ID (应用ID)</label>
+                            <input 
+                                type="text" 
+                                value={alibabaConfig.appId}
+                                onChange={(e) => handleAlibabaChange('appId', e.target.value)}
+                                placeholder="app-..."
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-orange-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">API Key (DashScope)</label>
+                            <input 
+                                type="password" 
+                                value={alibabaConfig.apiKey}
+                                onChange={(e) => handleAlibabaChange('apiKey', e.target.value)}
+                                placeholder="sk-..."
+                                className="w-full p-2 text-sm border border-gray-300 rounded focus:border-orange-500 outline-none"
+                            />
+                        </div>
+                        <div className="col-span-full">
+                           <p className="text-xs text-gray-400">
+                             请前往阿里云百炼 (Model Studio) 控制台创建一个应用并发布，获取 App ID 和 API Key。
+                           </p>
+                        </div>
+                    </div>
+                )}
             </div>
           </div>
 
-          {/* Section 2: Guidelines */}
+          {/* Section 3: Guidelines */}
           <div>
             <h3 className="text-gray-800 font-bold mb-3 flex items-center gap-2">
               <AlertTriangle size={18} className="text-orange-500" /> 学科特定行为准则

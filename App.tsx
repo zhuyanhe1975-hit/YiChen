@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import ChatInterface from './components/ChatInterface';
 import KnowledgeNetwork from './components/KnowledgeNetwork';
@@ -7,16 +8,34 @@ import PowerDashboard from './components/PowerDashboard';
 import SettingsModal from './components/SettingsModal';
 import TrainingGround from './components/TrainingGround';
 import HomeworkHelper from './components/HomeworkHelper';
-import { Message, MessageRole, KnowledgeMapData, WrongQuestion, Subject, UserStats, TrainingRecommendation, SubjectGuidelines, HomeworkTask, Tab, AppState } from './types';
-import { MessageCircle, Share2, BookOpen, Zap, Settings, Map, ClipboardList } from 'lucide-react';
-import { INITIAL_GREETING, APP_NAME, DEFAULT_SUBJECT_GUIDELINES } from './constants';
+import KnowledgeBase from './components/KnowledgeBase';
+import DataManager from './components/DataManager';
+import { Message, MessageRole, KnowledgeMapData, WrongQuestion, Subject, UserStats, TrainingRecommendation, SubjectGuidelines, HomeworkTask, Tab, AppState, VertexAIConfig, TencentConfig, AlibabaRAGConfig, RAGProvider, AIConfig } from './types';
+import { MessageCircle, Share2, BookOpen, Zap, Settings, Map, ClipboardList, Database, HardDrive } from 'lucide-react';
+import { INITIAL_GREETING, APP_NAME, DEFAULT_SUBJECT_GUIDELINES, DEFAULT_AI_CONFIG } from './constants';
 import { analyzeWeakness } from './services/geminiService';
 
 const STORAGE_KEY = 'dragon_ball_ai_assistant_data';
 
 const App: React.FC = () => {
+  // Helper to load state synchronously
+  const loadInitialState = (): AppState | null => {
+    try {
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        return JSON.parse(savedData);
+      }
+    } catch (e) {
+      console.error("Failed to load saved data", e);
+    }
+    return null;
+  };
+
+  const initialState = loadInitialState();
+
   const [activeTab, setActiveTab] = useState<Tab>(Tab.CHAT);
-  const [messages, setMessages] = useState<Message[]>([
+  
+  const [messages, setMessages] = useState<Message[]>(initialState?.messages || [
     {
       id: 'init',
       role: MessageRole.MODEL,
@@ -24,17 +43,38 @@ const App: React.FC = () => {
       timestamp: Date.now()
     }
   ]);
-  const [knowledgeData, setKnowledgeData] = useState<KnowledgeMapData | null>(null);
-  const [wrongQuestions, setWrongQuestions] = useState<WrongQuestion[]>([]);
-  const [recommendations, setRecommendations] = useState<TrainingRecommendation[]>([]);
-  const [homeworkTasks, setHomeworkTasks] = useState<HomeworkTask[]>([]);
+  
+  const [knowledgeData, setKnowledgeData] = useState<KnowledgeMapData | null>(initialState?.knowledgeData || null);
+  const [wrongQuestions, setWrongQuestions] = useState<WrongQuestion[]>(initialState?.wrongQuestions || []);
+  const [recommendations, setRecommendations] = useState<TrainingRecommendation[]>(initialState?.recommendations || []);
+  const [homeworkTasks, setHomeworkTasks] = useState<HomeworkTask[]>(initialState?.homeworkTasks || []);
   
   // Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [guidelines, setGuidelines] = useState<SubjectGuidelines>(DEFAULT_SUBJECT_GUIDELINES);
+  const [guidelines, setGuidelines] = useState<SubjectGuidelines>(initialState?.guidelines || DEFAULT_SUBJECT_GUIDELINES);
+  const [vertexConfig, setVertexConfig] = useState<VertexAIConfig>(initialState?.vertexAIConfig || { projectId: '', location: 'global', dataStoreId: '' });
+  const [tencentConfig, setTencentConfig] = useState<TencentConfig>(initialState?.tencentConfig || { secretId: '', secretKey: '', knowledgeBaseId: '', region: 'ap-guangzhou' });
+  const [alibabaConfig, setAlibabaConfig] = useState<AlibabaRAGConfig>(initialState?.alibabaRAGConfig || { appId: '', apiKey: '' });
+  const [ragProvider, setRagProvider] = useState<RAGProvider>(initialState?.ragProvider || 'google');
+  const [cloudStorageUrl, setCloudStorageUrl] = useState<string>(initialState?.cloudStorageUrl || '');
+  
+  // Initialize AI Config
+  const [aiConfig, setAIConfig] = useState<AIConfig>(() => {
+    const saved = initialState?.aiConfig;
+    const defaultConfig = { ...DEFAULT_AI_CONFIG, apiKey: process.env.API_KEY || '' };
+    
+    if (saved) {
+       // Restore saved config, but ensure we don't overwrite a valid env key with an empty string if using gemini default
+       if ((!saved.apiKey || saved.apiKey === '') && saved.provider === 'gemini' && process.env.API_KEY) {
+           saved.apiKey = process.env.API_KEY;
+       }
+       return saved;
+    }
+    return defaultConfig;
+  });
 
   // Stats
-  const [stats, setStats] = useState<UserStats>({
+  const [stats, setStats] = useState<UserStats>(initialState?.stats || {
     powerLevel: 5000,
     subjects: {
       [Subject.CHINESE]: 75,
@@ -48,25 +88,6 @@ const App: React.FC = () => {
     }
   });
 
-  // Load Data on Mount
-  useEffect(() => {
-    const savedData = localStorage.getItem(STORAGE_KEY);
-    if (savedData) {
-      try {
-        const parsed: AppState = JSON.parse(savedData);
-        if (parsed.messages) setMessages(parsed.messages);
-        if (parsed.knowledgeData) setKnowledgeData(parsed.knowledgeData);
-        if (parsed.wrongQuestions) setWrongQuestions(parsed.wrongQuestions);
-        if (parsed.homeworkTasks) setHomeworkTasks(parsed.homeworkTasks);
-        if (parsed.stats) setStats(parsed.stats);
-        if (parsed.guidelines) setGuidelines(parsed.guidelines);
-        if (parsed.recommendations) setRecommendations(parsed.recommendations);
-      } catch (e) {
-        console.error("Failed to load saved data", e);
-      }
-    }
-  }, []);
-
   // Save Data on Change
   useEffect(() => {
     const appState: AppState = {
@@ -76,10 +97,16 @@ const App: React.FC = () => {
       homeworkTasks,
       stats,
       guidelines,
-      recommendations
+      recommendations,
+      vertexAIConfig: vertexConfig,
+      tencentConfig: tencentConfig,
+      alibabaRAGConfig: alibabaConfig,
+      ragProvider: ragProvider,
+      aiConfig: aiConfig,
+      cloudStorageUrl: cloudStorageUrl
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-  }, [messages, knowledgeData, wrongQuestions, homeworkTasks, stats, guidelines, recommendations]);
+  }, [messages, knowledgeData, wrongQuestions, homeworkTasks, stats, guidelines, recommendations, vertexConfig, tencentConfig, alibabaConfig, ragProvider, aiConfig, cloudStorageUrl]);
 
   // Export Data
   const handleExportData = () => {
@@ -90,7 +117,13 @@ const App: React.FC = () => {
       homeworkTasks,
       stats,
       guidelines,
-      recommendations
+      recommendations,
+      vertexAIConfig: vertexConfig,
+      tencentConfig: tencentConfig,
+      alibabaRAGConfig: alibabaConfig,
+      ragProvider: ragProvider,
+      aiConfig: aiConfig,
+      cloudStorageUrl: cloudStorageUrl
     };
     const dataStr = JSON.stringify(appState, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -104,33 +137,65 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Import Data
-  const handleImportData = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const parsed: AppState = JSON.parse(text);
-        
-        // Restore State
-        if (parsed.messages) setMessages(parsed.messages);
-        if (parsed.knowledgeData) setKnowledgeData(parsed.knowledgeData);
-        if (parsed.wrongQuestions) setWrongQuestions(parsed.wrongQuestions);
-        if (parsed.homeworkTasks) setHomeworkTasks(parsed.homeworkTasks);
-        if (parsed.stats) setStats(parsed.stats);
-        if (parsed.guidelines) setGuidelines(parsed.guidelines);
-        if (parsed.recommendations) setRecommendations(parsed.recommendations);
-        
-        alert("数据导入成功！您的战斗力已恢复！");
-      } catch (error) {
-        alert("数据文件格式错误，无法解析！");
-      }
-    };
-    reader.readAsText(file);
+  const handleExecuteImport = (parsed: AppState, strategy: 'merge' | 'overwrite') => {
+    try {
+        if (strategy === 'overwrite') {
+            // Overwrite strategy: Direct Replacement
+            if (parsed.messages) setMessages(parsed.messages);
+            if (parsed.knowledgeData) setKnowledgeData(parsed.knowledgeData);
+            if (parsed.wrongQuestions) setWrongQuestions(parsed.wrongQuestions);
+            if (parsed.homeworkTasks) setHomeworkTasks(parsed.homeworkTasks);
+            if (parsed.stats) setStats(parsed.stats);
+            if (parsed.guidelines) setGuidelines(parsed.guidelines);
+            if (parsed.recommendations) setRecommendations(parsed.recommendations);
+            if (parsed.vertexAIConfig) setVertexConfig(parsed.vertexAIConfig);
+            if (parsed.tencentConfig) setTencentConfig(parsed.tencentConfig);
+            if (parsed.alibabaRAGConfig) setAlibabaConfig(parsed.alibabaRAGConfig);
+            if (parsed.ragProvider) setRagProvider(parsed.ragProvider);
+            if (parsed.cloudStorageUrl) setCloudStorageUrl(parsed.cloudStorageUrl);
+            if (parsed.aiConfig) {
+                 if ((!parsed.aiConfig.apiKey || parsed.aiConfig.apiKey === '') && parsed.aiConfig.provider === 'gemini' && process.env.API_KEY) {
+                    parsed.aiConfig.apiKey = process.env.API_KEY;
+                }
+                setAIConfig(parsed.aiConfig);
+            }
+            alert("数据已成功覆盖重置！");
+        } else {
+            // Merge strategy: Deduplicate and Append
+            // 1. Messages
+            if (parsed.messages && Array.isArray(parsed.messages)) {
+                 const newMsgs = parsed.messages.filter(nm => !messages.some(em => em.id === nm.id));
+                 setMessages(prev => [...prev, ...newMsgs].sort((a,b) => a.timestamp - b.timestamp));
+            }
+            // 2. Wrong Questions
+            if (parsed.wrongQuestions && Array.isArray(parsed.wrongQuestions)) {
+                 const newQs = parsed.wrongQuestions.filter(nq => !wrongQuestions.some(eq => eq.id === nq.id));
+                 setWrongQuestions(prev => [...newQs, ...prev]);
+            }
+            // 3. Homework Tasks
+            if (parsed.homeworkTasks && Array.isArray(parsed.homeworkTasks)) {
+                 const newTasks = parsed.homeworkTasks.filter(nt => !homeworkTasks.some(et => et.id === nt.id));
+                 setHomeworkTasks(prev => [...newTasks, ...prev]);
+            }
+            
+            // For configs, we prefer the import if our local is empty, otherwise keep local? 
+            // Or overwrite? Simple merge usually implies taking latest or keeping existing. 
+            // Here we just merge lists. Configs are left as is unless user specifically overwrites.
+            
+            alert("数据已成功合并！(新增了未重复的记录)");
+        }
+    } catch (error) {
+        console.error("Import Execution Failed", error);
+        alert("导入过程中发生错误。");
+    }
   };
 
   const handleAddToWrongQuestions = (q: WrongQuestion) => {
     setWrongQuestions(prev => [q, ...prev]);
+  };
+  
+  const handleDeleteWrongQuestion = (id: string) => {
+      setWrongQuestions(prev => prev.filter(q => q.id !== id));
   };
 
   const generateTrainingPlan = async () => {
@@ -142,7 +207,7 @@ const App: React.FC = () => {
         return;
     }
 
-    const result = await analyzeWeakness(topics);
+    const result = await analyzeWeakness(topics, aiConfig);
     if (result && result.suggestions) {
         setRecommendations(result.suggestions);
     }
@@ -172,6 +237,35 @@ const App: React.FC = () => {
     }, 500);
   };
 
+  const handleSaveSettings = (newGuidelines: SubjectGuidelines, newVertexConfig?: VertexAIConfig, newTencentConfig?: TencentConfig, newAlibabaConfig?: AlibabaRAGConfig, newRagProvider?: RAGProvider, newAIConfig?: AIConfig) => {
+      setGuidelines(newGuidelines);
+      if (newVertexConfig) setVertexConfig(newVertexConfig);
+      if (newTencentConfig) setTencentConfig(newTencentConfig);
+      if (newAlibabaConfig) setAlibabaConfig(newAlibabaConfig);
+      if (newRagProvider) setRagProvider(newRagProvider);
+      if (newAIConfig) setAIConfig(newAIConfig);
+  };
+
+  // Message Deletion Logic
+  const handleDeleteMessage = (id: string) => {
+    setMessages(prev => prev.filter(m => m.id !== id));
+  };
+
+  const handleDeleteMultipleMessages = (ids: string[]) => {
+    setMessages(prev => prev.filter(m => !ids.includes(m.id)));
+  };
+
+  const handleClearMessages = () => {
+    if (confirm('确定要清空所有对话记录吗？此操作无法撤销。')) {
+       setMessages([{
+          id: 'init',
+          role: MessageRole.MODEL,
+          content: INITIAL_GREETING,
+          timestamp: Date.now()
+       }]);
+    }
+  };
+
   // Nav Item Helper
   const NavItem = ({ tab, icon: Icon, label }: { tab: Tab; icon: any; label: string }) => (
     <button
@@ -189,14 +283,17 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col md:flex-row overflow-hidden bg-[#fff7ed]">
-      {/* Settings Modal */}
+      {/* Settings Modal - Now simplified without Data features */}
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
         guidelines={guidelines}
-        onSave={setGuidelines}
-        onExportData={handleExportData}
-        onImportData={handleImportData}
+        onSave={handleSaveSettings}
+        initialVertexConfig={vertexConfig}
+        initialTencentConfig={tencentConfig}
+        initialAlibabaConfig={alibabaConfig}
+        initialRagProvider={ragProvider}
+        initialAIConfig={aiConfig}
       />
 
       {/* Sidebar / Bottom Nav for Mobile */}
@@ -211,13 +308,15 @@ const App: React.FC = () => {
             </div>
         </div>
         
-        <nav className="flex md:flex-col justify-around md:justify-start gap-1 md:gap-3 w-full overflow-x-auto md:overflow-visible">
+        <nav className="flex md:flex-col justify-around md:justify-start gap-1 md:gap-3 w-full overflow-x-auto md:overflow-visible scrollbar-hide">
             <NavItem tab={Tab.CHAT} icon={MessageCircle} label="对话" />
+            <NavItem tab={Tab.KNOWLEDGE} icon={Database} label="知识库" />
             <NavItem tab={Tab.HOMEWORK} icon={ClipboardList} label="作业帮手" />
             <NavItem tab={Tab.TRAINING} icon={Map} label="训练场" />
             <NavItem tab={Tab.NETWORK} icon={Share2} label="知识雷达" />
             <NavItem tab={Tab.WRONG_BOOK} icon={BookOpen} label="错题本" />
             <NavItem tab={Tab.STATS} icon={Zap} label="战斗力" />
+            <NavItem tab={Tab.DATA} icon={HardDrive} label="数据中心" />
         </nav>
 
         <div className="hidden md:flex flex-col mt-auto gap-4">
@@ -226,13 +325,8 @@ const App: React.FC = () => {
                 className="flex items-center gap-2 px-4 py-3 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors w-full text-left"
             >
                 <Settings size={20} />
-                <span>配置与备份</span>
+                <span>AI 配置</span>
             </button>
-
-            <div className="p-4 bg-orange-50 rounded-xl">
-                <p className="text-xs text-orange-600 mb-1 font-bold">每日格言</p>
-                <p className="text-xs text-gray-600 italic">"只有不断超越极限，才能成为超级赛亚人！"</p>
-            </div>
         </div>
       </div>
 
@@ -260,6 +354,24 @@ const App: React.FC = () => {
                     onAddToWrongQuestions={handleAddToWrongQuestions}
                     onUpdateKnowledgeMap={setKnowledgeData}
                     guidelines={guidelines}
+                    vertexConfig={vertexConfig}
+                    tencentConfig={tencentConfig}
+                    alibabaConfig={alibabaConfig}
+                    ragProvider={ragProvider}
+                    aiConfig={aiConfig}
+                    onDeleteMessage={handleDeleteMessage}
+                    onDeleteMultipleMessages={handleDeleteMultipleMessages}
+                    onClearMessages={handleClearMessages}
+                />
+            )}
+            {activeTab === Tab.KNOWLEDGE && (
+                <KnowledgeBase 
+                    vertexConfig={vertexConfig}
+                    tencentConfig={tencentConfig}
+                    alibabaConfig={alibabaConfig}
+                    ragProvider={ragProvider}
+                    guidelines={guidelines}
+                    aiConfig={aiConfig}
                 />
             )}
             {activeTab === Tab.HOMEWORK && (
@@ -279,7 +391,12 @@ const App: React.FC = () => {
             )}
             {activeTab === Tab.WRONG_BOOK && (
                 <div className="h-full p-4">
-                    <WrongQuestionBook questions={wrongQuestions} />
+                    <WrongQuestionBook 
+                        questions={wrongQuestions} 
+                        onAddQuestion={handleAddToWrongQuestions}
+                        onDeleteQuestion={handleDeleteWrongQuestion}
+                        aiConfig={aiConfig}
+                    />
                 </div>
             )}
             {activeTab === Tab.STATS && (
@@ -287,6 +404,14 @@ const App: React.FC = () => {
                     stats={stats} 
                     recommendations={recommendations} 
                     onGeneratePlan={generateTrainingPlan} 
+                />
+            )}
+            {activeTab === Tab.DATA && (
+                <DataManager 
+                    currentCloudUrl={cloudStorageUrl}
+                    onSaveCloudUrl={setCloudStorageUrl}
+                    onExportData={handleExportData}
+                    onExecuteImport={handleExecuteImport}
                 />
             )}
         </div>
